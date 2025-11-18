@@ -6,7 +6,7 @@ const app = Vue.createApp({
   data() {
     return {
       // Your backend API base URL
-      apiBase: "https://learn-app-backend-3.onrender.com/api",
+      apiBase: "https://learn-app-backend-3.onrender.com",
 
       // Which page the user is viewing
       view: "subjects",
@@ -14,12 +14,12 @@ const app = Vue.createApp({
       // Search text
       searchQuery: "",
 
-      // Sorting for subjects page
-      subjectsSort: "asc",
+      // Sorting for subjects page (matches HTML: subjectsSortDir)
+      subjectsSortDir: "asc",
 
-      // Sorting for locations page
-      sortType: "location",
-      sortDirection: "asc",
+      // Sorting for locations page (matches HTML: sortOption + sortDir)
+      sortOption: "location",
+      sortDir: "asc",
 
       // Data loaded from the backend
       lessons: [],
@@ -52,7 +52,9 @@ const app = Vue.createApp({
       // Filter based on subject or city match
       const filtered = this.lessons.filter(lesson => {
         const subjectMatch = lesson.subject.toLowerCase().includes(term);
-        const cityMatch = lesson.locations.some(l => l.city.toLowerCase().includes(term));
+        const cityMatch = lesson.locations.some(l =>
+          l.city.toLowerCase().includes(term)
+        );
         return term === "" || subjectMatch || cityMatch;
       });
 
@@ -61,7 +63,7 @@ const app = Vue.createApp({
         a.subject.localeCompare(b.subject)
       );
 
-      return this.subjectsSort === "asc" ? sorted : sorted.reverse();
+      return this.subjectsSortDir === "asc" ? sorted : sorted.reverse();
     },
 
     // Sort locations inside selected subject
@@ -69,20 +71,24 @@ const app = Vue.createApp({
       if (!this.selectedSubject) return [];
 
       const arr = [...this.selectedSubject.locations];
-      const dir = this.sortDirection === "asc" ? 1 : -1;
+      const dir = this.sortDir === "asc" ? 1 : -1;
 
       return arr.sort((a, b) => {
         let aVal, bVal;
 
-        if (this.sortType === "location") {
+        if (this.sortOption === "location") {
           aVal = a.city.toLowerCase();
           bVal = b.city.toLowerCase();
-        } else if (this.sortType === "price") {
+        } else if (this.sortOption === "price") {
           aVal = a.price;
           bVal = b.price;
-        } else if (this.sortType === "spaces") {
+        } else if (this.sortOption === "spaces") {
           aVal = a.spaces;
           bVal = b.spaces;
+        } else if (this.sortOption === "subject") {
+          // all locations share the same subject, but we keep this for completeness
+          aVal = this.selectedSubject.subject.toLowerCase();
+          bVal = this.selectedSubject.subject.toLowerCase();
         }
 
         if (aVal > bVal) return 1 * dir;
@@ -140,9 +146,17 @@ const app = Vue.createApp({
     // Convert "images/maths.png" → backend full URL
     imageUrl(src) {
       if (!src) return "";
+
+      // If it's already an absolute URL, just return it
+      if (/^https?:\/\//i.test(src)) {
+        return src;
+      }
+
+      // If it's "images/..." from the DB, prepend backend origin
       if (src.startsWith("images/")) {
         return `${this.backendOrigin()}/${src}`;
       }
+
       return src;
     },
 
