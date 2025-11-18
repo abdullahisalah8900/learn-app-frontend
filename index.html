@@ -72,8 +72,8 @@
                :key="lesson._id">
 
             <div class="card subject-card" @click="selectSubject(lesson)">
-              <!-- IMPORTANT: image works now -->
-              <img :src="lesson.image" class="subject-thumb">
+              <!-- UPDATED LINE: now uses imageUrl() -->
+              <img :src="imageUrl(lesson.image)" class="subject-thumb">
               <div class="card-body text-center">
                 <h6 class="card-title">{{ lesson.subject }}</h6>
               </div>
