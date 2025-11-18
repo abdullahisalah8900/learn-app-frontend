@@ -6,7 +6,7 @@ const app = Vue.createApp({
   data() {
     return {
       // Your backend API base URL
-      apiBase: "https://learn-app-backend-3.onrender.com",
+      apiBase: "https://learn-app-backend-3.onrender.com/api",
 
       // Which page the user is viewing
       view: "subjects",
