@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Lessons to Learn</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Bootstrap + FontAwesome -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet"/>
+
+  <!--external CSS -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+  <!-- Vue will control everything inside #app -->
+  <div id="app" class="container-fluid p-0">
+
+    <!-- ================= NAVBAR ================= -->
+    <nav class="navbar navbar-dark px-3 py-2" style="background:#1e293b;">
+      <a class="navbar-brand text-white fw-bold" href="#" @click.prevent="go('subjects')">
+        Lessons to Learn
+      </a>
+
+      <button class="btn btn-outline-light"
+              :disabled="!cartCount"
+              @click="go('cart')">
+        <i class="fa fa-shopping-basket"></i>
+        <span v-if="cartCount">({{ cartCount }})</span>
+      </button>
+    </nav>
+
+    <div class="container py-4">
+
+      <!-- ============= SUBJECTS PAGE ============= -->
+      <section v-if="view === 'subjects'">
+
+        <div class="d-flex justify-content-between mb-3">
+          <h2>Select a Subject</h2>
+
+          <!-- Sort dropdown -->
+          <select v-model="subjectsSortDir" class="form-select w-auto">
+            <option value="asc">A → Z</option>
+            <option value="desc">Z → A</option>
+          </select>
+        </div>
+
+        <!-- Search bar -->
+        <input type="text"
+               class="form-control mb-3"
+               placeholder="Search subject or city..."
+               v-model="searchQuery"
+               @input="updateSuggestions">
+
+        <!-- Suggestions -->
+        <ul v-if="suggestions.length && searchQuery"
+            class="list-group mb-3 shadow-sm">
+          <li v-for="(s, i) in suggestions"
+              :key="i"
+              class="list-group-item list-group-item-action"
+              @click="applySuggestion(s)">
+            {{ s }}
+          </li>
+        </ul>
+
+        <!-- Subject cards -->
+        <div class="row">
+          <div class="col-sm-6 col-md-4 col-lg-3 mb-3"
+               v-for="lesson in orderedFilteredLessons"
+               :key="lesson._id">
+
+            <div class="card subject-card" @click="selectSubject(lesson)">
+              <!-- IMPORTANT: image works now -->
+              <img :src="lesson.image" class="subject-thumb">
+              <div class="card-body text-center">
+                <h6 class="card-title">{{ lesson.subject }}</h6>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- ============= LOCATIONS PAGE ============= -->
+      <section v-if="view === 'locations'">
+
+        <div class="d-flex justify-content-between mb-3">
+          <h2>{{ selectedSubject.subject }} – Locations</h2>
+
+          <div class="d-flex gap-2">
+            <select v-model="sortOption" class="form-select w-auto">
+              <option value="location">Location</option>
+              <option value="price">Price</option>
+              <option value="spaces">Spaces</option>
+              <option value="subject">Subject</option>
+            </select>
+
+            <select v-model="sortDir" class="form-select w-auto">
+              <option value="asc">Asc</option>
+              <option value="desc">Desc</option>
+            </select>
+          </div>
+        </div>
+
+        <ul class="list-group mb-3">
+          <li v-for="loc in sortedLocations"
+              :key="loc.city"
+              class="list-group-item d-flex justify-content-between align-items-center"
+              :class="{ 'out-of-stock': loc.spaces === 0 }">
+
+            <div>
+              <strong>{{ loc.city }}</strong> – £{{ loc.price }}
+              <span v-if="loc.spaces > 0"> (Spaces: {{ loc.spaces }})</span>
+            </div>
+
+            <button class="btn btn-primary btn-sm"
+                    :disabled="loc.spaces === 0"
+                    @click="addToCart(loc)">Add</button>
+          </li>
+        </ul>
+
+        <button class="btn btn-secondary" @click="go('subjects')">Back</button>
+        <button class="btn btn-outline-dark ms-2" @click="go('cart')">Cart</button>
+      </section>
+
+      <!-- ============= CART PAGE ============= -->
+      <section v-if="view === 'cart'">
+        <h2>Your Cart</h2>
+
+        <div v-if="!cart.length" class="alert alert-warning">Cart is empty.</div>
+
+        <ul v-else class="list-group mb-3">
+          <li v-for="item in groupedCart"
+              :key="item.subject + item.city"
+              class="list-group-item d-flex justify-content-between align-items-center">
+
+            <span>
+              {{ item.subject }} ({{ item.city }}) × {{ item.quantity }}
+              = £{{ item.quantity * item.price }}
+            </span>
+
+            <div>
+              <button class="btn btn-sm btn-outline-secondary me-2"
+                      @click="removeOne(item)">Remove 1</button>
+              <button class="btn btn-sm btn-outline-danger"
+                      @click="removeAll(item)">Remove All</button>
+            </div>
+          </li>
+        </ul>
+
+        <div v-if="cart.length" class="d-flex justify-content-between">
+          <h5>Total: £{{ cartTotal }}</h5>
+          <button class="btn btn-success" @click="go('checkout')">Checkout</button>
+        </div>
+      </section>
+
+      <!-- ============= CHECKOUT PAGE ============= -->
+      <section v-if="view === 'checkout'">
+
+        <h2>Checkout</h2>
+
+        <form @submit.prevent="checkout" class="col-md-6 p-0 mb-3">
+          <input v-model="customer.name"
+                 class="form-control mb-2"
+                 placeholder="Full Name"
+                 required>
+
+          <input v-model="customer.phone"
+                 class="form-control mb-2"
+                 placeholder="Phone Number"
+                 required>
+
+          <button class="btn btn-primary" :disabled="!isCheckoutValid">
+            Submit Order
+          </button>
+        </form>
+
+        <div v-if="orderMessage" class="alert alert-success">
+          {{ orderMessage }}
+        </div>
+
+      </section>
+
+    </div>
+  </div>
+
+  <!-- Vue and App.js -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="app.js"></script>
+
+</body>
+</html>

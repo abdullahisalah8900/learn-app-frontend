@@ -1,0 +1,54 @@
+/* GLOBAL PAGE STYLING */
+body {
+  background-color: #f8fafc;
+  color: #1e293b;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* NAVBAR */
+.navbar {
+  background-color: #1e293b !important;
+}
+
+/* SUBJECT CARDS */
+.subject-card {
+  cursor: pointer;
+  transition: transform 0.15s ease-in-out, box-shadow 0.15s;
+  overflow: hidden;
+  border-radius: .5rem;
+}
+
+.subject-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 12px rgba(0,0,0,.15);
+}
+
+/* SUBJECT THUMBNAILS */
+.subject-thumb {
+  width: 100%;
+  height: 100px;
+  object-fit: cover;
+  display: block;
+}
+
+/* OUT OF STOCK LOOK */
+.list-group-item.out-of-stock {
+  opacity: .6;
+  pointer-events: none;
+}
+
+/* BUTTON COLORS */
+.btn-primary {
+  background-color: #2563eb;
+  border-color: #2563eb;
+}
+
+.btn-primary:hover {
+  background-color: #1d4ed8;
+}
+
+/* SEARCH SUGGESTIONS */
+.list-group-item-action:hover {
+  background-color: #e2e8f0;
+  cursor: pointer;
+}
