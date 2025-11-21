@@ -1,237 +1,241 @@
-// =============================
-// Frontend App (Vue)
-// =============================
+// ===================================
+// Lessons App Frontend (Vue 3)
+// ===================================
 
 const app = Vue.createApp({
   data() {
     return {
-      // Your backend API base URL
+      // Backend API base (adjust if needed)
       apiBase: "https://learn-app-backend-3.onrender.com/api",
 
-      // Which page the user is viewing
-      view: "subjects",
+      // Which page is shown: "lessons" or "cart"
+      view: "lessons",
 
-      // Search text
+      // Search text (search as you type)
       searchQuery: "",
 
-      // Sorting for subjects page (matches HTML: subjectsSortDir)
-      subjectsSortDir: "asc",
-
-      // Sorting for locations page (matches HTML: sortOption + sortDir)
-      sortOption: "location",
+      // Sorting options
+      // attribute: "subject", "location", "price", "spaces"
+      sortAttribute: "subject",
       sortDir: "asc",
 
-      // Data loaded from the backend
+      // List of lessons loaded from backend
+      // Each lesson: { subject, location, price, spaces, image }
       lessons: [],
 
-      // The subject the user clicked
-      selectedSubject: null,
-
-      // Shopping cart
+      // Cart holds 1 entry per seat added
+      // { subject, location, price }
       cart: [],
 
       // Checkout form
-      customer: { name: "", phone: "" },
+      customer: {
+        name: "",
+        phone: ""
+      },
 
-      // Success message after order
-      orderMessage: "",
-
-      // Live search suggestions
-      suggestions: []
+      // Confirmation message after checkout
+      orderMessage: ""
     };
   },
 
-  // =========================================
-  // Computed Properties (auto-calculated)
-  // =========================================
   computed: {
-    // Filter + sort subjects
-    orderedFilteredLessons() {
+    // Lessons after search + sort
+    displayedLessons() {
       const term = this.searchQuery.toLowerCase();
+      let filtered = [];
 
-      // Filter based on subject or city match
-      const filtered = this.lessons.filter(lesson => {
-        const subjectMatch = lesson.subject.toLowerCase().includes(term);
-        const cityMatch = lesson.locations.some(l =>
-          l.city.toLowerCase().includes(term)
-        );
-        return term === "" || subjectMatch || cityMatch;
-      });
-
-      // Sort A-Z or Z-A
-      const sorted = filtered.sort((a, b) =>
-        a.subject.localeCompare(b.subject)
-      );
-
-      return this.subjectsSortDir === "asc" ? sorted : sorted.reverse();
-    },
-
-    // Sort locations inside selected subject
-    sortedLocations() {
-      if (!this.selectedSubject) return [];
-
-      const arr = [...this.selectedSubject.locations];
-      const dir = this.sortDir === "asc" ? 1 : -1;
-
-      return arr.sort((a, b) => {
-        let aVal, bVal;
-
-        if (this.sortOption === "location") {
-          aVal = a.city.toLowerCase();
-          bVal = b.city.toLowerCase();
-        } else if (this.sortOption === "price") {
-          aVal = a.price;
-          bVal = b.price;
-        } else if (this.sortOption === "spaces") {
-          aVal = a.spaces;
-          bVal = b.spaces;
-        } else if (this.sortOption === "subject") {
-          // all locations share the same subject, but we keep this for completeness
-          aVal = this.selectedSubject.subject.toLowerCase();
-          bVal = this.selectedSubject.subject.toLowerCase();
+      // 1. Filter - full-text search
+      for (const lesson of this.lessons) {
+        if (!term) {
+          filtered.push(lesson);
+          continue;
         }
 
-        if (aVal > bVal) return 1 * dir;
-        if (aVal < bVal) return -1 * dir;
+        const subjectText  = (lesson.subject  || "").toLowerCase();
+        const locationText = (lesson.location || "").toLowerCase();
+        const priceText    = String(lesson.price  || "").toLowerCase();
+        const spacesText   = String(lesson.spaces || "").toLowerCase();
+
+        if (
+          subjectText.includes(term)  ||
+          locationText.includes(term) ||
+          priceText.includes(term)    ||
+          spacesText.includes(term)
+        ) {
+          filtered.push(lesson);
+        }
+      }
+
+      // 2. Sort
+      filtered.sort((a, b) => {
+        const aVal = this.getSortValue(a);
+        const bVal = this.getSortValue(b);
+
+        if (aVal > bVal) return 1;
+        if (aVal < bVal) return -1;
         return 0;
       });
+
+      if (this.sortDir === "desc") {
+        filtered.reverse();
+      }
+
+      return filtered;
     },
 
-    // Group cart items by subject + city
+    // Number of items in cart
+    cartCount() {
+      return this.cart.length;
+    },
+
+    // Group cart items by subject + location for display and checkout
     groupedCart() {
       const groups = {};
 
       for (const item of this.cart) {
-        const key = item.subject + "-" + item.city;
+        const key = item.subject + "|" + item.location;
 
         if (!groups[key]) {
-          groups[key] = { ...item, quantity: 0 };
+          groups[key] = {
+            subject: item.subject,
+            location: item.location,
+            price: item.price,
+            quantity: 0
+          };
         }
-        groups[key].quantity++;
+
+        groups[key].quantity += 1;
       }
 
       return Object.values(groups);
     },
 
-    cartCount() {
-      return this.cart.length;
-    },
-
+    // Total cart price
     cartTotal() {
-      return this.cart.reduce((sum, item) => sum + item.price, 0);
+      let total = 0;
+      for (const item of this.groupedCart) {
+        total += item.price * item.quantity;
+      }
+      return total;
     },
 
+    // Checkout validation: name letters only, phone numbers only + cart not empty
     isCheckoutValid() {
-      const nameOK = /^[a-zA-Z ]+$/.test(this.customer.name);
+      const nameOK  = /^[A-Za-z ]+$/.test(this.customer.name);
       const phoneOK = /^[0-9]+$/.test(this.customer.phone);
       return nameOK && phoneOK && this.cart.length > 0;
     }
   },
 
-  // =============================
-  // Methods
-  // =============================
   methods: {
-    // Change view/page
+    // Change page
     go(page) {
       this.view = page;
     },
 
-    // Backend URL for images
-    backendOrigin() {
-      const u = new URL(this.apiBase);
-      return u.origin;
+    // Helper to get value used for sorting
+    getSortValue(lesson) {
+      if (this.sortAttribute === "subject") {
+        return (lesson.subject || "").toLowerCase();
+      }
+      if (this.sortAttribute === "location") {
+        return (lesson.location || "").toLowerCase();
+      }
+      if (this.sortAttribute === "price") {
+        return lesson.price || 0;
+      }
+      if (this.sortAttribute === "spaces") {
+        return lesson.spaces || 0;
+      }
+      return 0;
     },
 
-    // Convert "images/maths.png" → backend full URL
+    // Build full image URL if using backend images
+    backendOrigin() {
+      try {
+        return new URL(this.apiBase).origin;
+      } catch {
+        return "";
+      }
+    },
+
     imageUrl(src) {
       if (!src) return "";
-
-      // If it's already an absolute URL, just return it
-      if (/^https?:\/\//i.test(src)) {
-        return src;
-      }
-
-      // If it's "images/..." from the DB, prepend backend origin
       if (src.startsWith("images/")) {
-        return `${this.backendOrigin()}/${src}`;
+        return this.backendOrigin() + "/" + src;
       }
-
       return src;
     },
 
-    // Load lessons from backend
+    // Load lessons from backend 
     async loadLessons() {
       try {
-        const res = await fetch(`${this.apiBase}/lessons`);
-        if (!res.ok) throw new Error("Failed");
-        this.lessons = await res.json();
-      } catch (err) {
-        alert("Could not load lessons");
-      }
-    },
+        const res = await fetch(this.apiBase + "/lessons");
+        if (!res.ok) throw new Error("Failed to fetch lessons");
+        const data = await res.json();
 
-    // When user selects a subject
-    selectSubject(lesson) {
-      this.selectedSubject = lesson;
-      this.view = "locations";
+        // Expecting: [{ subject, location, price, spaces, image }, ...]
+        this.lessons = data;
+      } catch (err) {
+        console.error("Could not load lessons:", err);
+        alert("Could not load lessons.");
+      }
     },
 
     // Add one seat to cart
-    addToCart(loc) {
-      if (loc.spaces <= 0) return;
+    addToCart(lesson) {
+      if (!lesson || lesson.spaces <= 0) return;
 
-      loc.spaces--;
+      // Decrease spaces in lesson
+      lesson.spaces -= 1;
+
+      // Add to cart
       this.cart.push({
-        subject: this.selectedSubject.subject,
-        city: loc.city,
-        price: loc.price
+        subject: lesson.subject,
+        location: lesson.location,
+        price: lesson.price
       });
     },
 
-    // Remove a single cart item
-    removeOne(item) {
+    // Remove a seat for a given subject+location
+    // and add that space back to the lesson list
+    removeOne(groupItem) {
+      // 1. Remove one matching item from cart
       const index = this.cart.findIndex(
-        i => i.subject === item.subject && i.city === item.city
+        (c) =>
+          c.subject === groupItem.subject &&
+          c.location === groupItem.location
       );
+
       if (index !== -1) {
         this.cart.splice(index, 1);
+      }
 
-        // restore space
-        const lesson = this.lessons.find(l => l.subject === item.subject);
-        const loc = lesson.locations.find(l => l.city === item.city);
-        loc.spaces++;
+      // 2. Increase spaces back in lessons list
+      const lesson = this.lessons.find(
+        (l) =>
+          l.subject === groupItem.subject &&
+          l.location === groupItem.location
+      );
+      if (lesson) {
+        lesson.spaces += 1;
       }
     },
 
-    // Remove all of that item
-    removeAll(item) {
-      const count = item.quantity;
-
-      // Filter cart
-      this.cart = this.cart.filter(
-        i => !(i.subject === item.subject && i.city === item.city)
-      );
-
-      // Restore spaces
-      const lesson = this.lessons.find(l => l.subject === item.subject);
-      const loc = lesson.locations.find(l => l.city === item.city);
-      loc.spaces += count;
-    },
-
-    // Checkout logic
+    // Checkout: send order to backend and update spaces
     async checkout() {
       if (!this.isCheckoutValid) return;
 
       const order = {
         name: this.customer.name,
         phone: this.customer.phone,
-        items: this.groupedCart,
+        items: this.groupedCart, // subject, location, price, quantity
         total: this.cartTotal
       };
 
       try {
-        const res = await fetch(`${this.apiBase}/order`, {
+        // 1. Send order
+        const res = await fetch(this.apiBase + "/order", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(order)
@@ -239,63 +243,43 @@ const app = Vue.createApp({
 
         if (!res.ok) throw new Error("Order failed");
 
-        // Update DB lesson spaces
+        // 2. Update spaces in DB for each grouped item
         for (const item of this.groupedCart) {
-          const lesson = this.lessons.find(l => l.subject === item.subject);
-          const loc = lesson.locations.find(l => l.city === item.city);
+          const lesson = this.lessons.find(
+            (l) =>
+              l.subject === item.subject &&
+              l.location === item.location
+          );
+          if (!lesson) continue;
 
-          await fetch(`${this.apiBase}/lessons`, {
+          await fetch(this.apiBase + "/lessons", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               subject: item.subject,
-              city: item.city,
-              spaces: loc.spaces
+              location: item.location,
+              spaces: lesson.spaces
             })
           });
         }
 
+        // 3. Clear cart and form, show message
         this.orderMessage = "Order submitted!";
         this.cart = [];
         this.customer = { name: "", phone: "" };
-        this.view = "checkout";
 
+        // Reload lessons from DB (in case spaces changed on server)
+        await this.loadLessons();
       } catch (err) {
-        alert("Error submitting order");
+        console.error("Error submitting order:", err);
+        alert("There was a problem submitting your order.");
       }
-    },
-
-    // Live search suggestions
-    updateSuggestions() {
-      const term = this.searchQuery.toLowerCase();
-      if (!term) {
-        this.suggestions = [];
-        return;
-      }
-
-      const subjects = this.lessons
-        .map(l => l.subject)
-        .filter(s => s.toLowerCase().includes(term));
-
-      const cities = this.lessons
-        .flatMap(l => l.locations.map(loc => loc.city))
-        .filter(c => c.toLowerCase().includes(term));
-
-      // Remove duplicates + limit
-      this.suggestions = [...new Set([...subjects, ...cities])].slice(0, 6);
-    },
-
-    applySuggestion(text) {
-      this.searchQuery = text;
-      this.suggestions = [];
     }
   },
 
-  // Load lessons at page start
   mounted() {
     this.loadLessons();
   }
 });
 
-// Mount app to HTML
 app.mount("#app");

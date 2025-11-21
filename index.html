@@ -6,189 +6,258 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <!-- Bootstrap + FontAwesome -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet"/>
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
+  <link
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    rel="stylesheet"
+  />
 
-  <!--external CSS -->
-  <link rel="stylesheet" href="styles.css">
+  <!-- external CSS (keeps design / colours / cards) -->
+  <link rel="stylesheet" href="styles.css" />
 </head>
 
 <body>
-
-  <!-- Vue will control everything inside #app -->
+  <!-- Vue controls everything inside #app -->
   <div id="app" class="container-fluid p-0">
-
-    <!-- ================= NAVBAR ================= -->
-    <nav class="navbar navbar-dark px-3 py-2" style="background:#1e293b;">
-      <a class="navbar-brand text-white fw-bold" href="#" @click.prevent="go('subjects')">
+    <!-- ============ NAVBAR ============ -->
+    <nav class="navbar navbar-dark px-3 py-2">
+      <a
+        href="#"
+        class="navbar-brand text-white fw-bold"
+        @click.prevent="go('lessons')"
+      >
         Lessons to Learn
       </a>
 
-      <button class="btn btn-outline-light"
-              :disabled="!cartCount"
-              @click="go('cart')">
+      <button
+        class="btn btn-outline-light"
+        :disabled="!cartCount"
+        :title="cartCount ? 'Open cart' : 'Cart is empty'"
+        @click="go(view === 'cart' ? 'lessons' : 'cart')"
+      >
         <i class="fa fa-shopping-basket"></i>
         <span v-if="cartCount">({{ cartCount }})</span>
       </button>
     </nav>
 
     <div class="container py-4">
-
-      <!-- ============= SUBJECTS PAGE ============= -->
-      <section v-if="view === 'subjects'">
-
-        <div class="d-flex justify-content-between mb-3">
-          <h2>Select a Subject</h2>
-
-          <!-- Sort dropdown -->
-          <select v-model="subjectsSortDir" class="form-select w-auto">
-            <option value="asc">A → Z</option>
-            <option value="desc">Z → A</option>
-          </select>
-        </div>
-
-        <!-- Search bar -->
-        <input type="text"
-               class="form-control mb-3"
-               placeholder="Search subject or city..."
-               v-model="searchQuery"
-               @input="updateSuggestions">
-
-        <!-- Suggestions -->
-        <ul v-if="suggestions.length && searchQuery"
-            class="list-group mb-3 shadow-sm">
-          <li v-for="(s, i) in suggestions"
-              :key="i"
-              class="list-group-item list-group-item-action"
-              @click="applySuggestion(s)">
-            {{ s }}
-          </li>
-        </ul>
-
-        <!-- Subject cards -->
-        <div class="row">
-          <div class="col-sm-6 col-md-4 col-lg-3 mb-3"
-               v-for="lesson in orderedFilteredLessons"
-               :key="lesson._id">
-
-            <div class="card subject-card" @click="selectSubject(lesson)">
-              <!-- UPDATED LINE: now uses imageUrl() -->
-              <img :src="imageUrl(lesson.image)" class="subject-thumb">
-              <div class="card-body text-center">
-                <h6 class="card-title">{{ lesson.subject }}</h6>
-              </div>
-            </div>
-
+      <!-- ==============================
+           LESSONS PAGE (view === 'lessons')
+           ============================== -->
+      <section v-if="view === 'lessons'">
+        <!-- Header row: title + sort controls -->
+        <div class="d-flex flex-wrap align-items-end gap-3 mb-3">
+          <div>
+            <h2 class="mb-1">Available Lessons</h2>
+            <p class="text-muted mb-0">
+              Browse lessons, sort them, and add seats to your cart.
+            </p>
           </div>
-        </div>
-      </section>
 
-      <!-- ============= LOCATIONS PAGE ============= -->
-      <section v-if="view === 'locations'">
-
-        <div class="d-flex justify-content-between mb-3">
-          <h2>{{ selectedSubject.subject }} – Locations</h2>
-
-          <div class="d-flex gap-2">
-            <select v-model="sortOption" class="form-select w-auto">
+          <!-- Sort controls -->
+          <div class="ms-auto d-flex flex-wrap align-items-center gap-2">
+            <label class="form-label mb-0">Sort by:</label>
+            <select
+              v-model="sortAttribute"
+              class="form-select form-select-sm w-auto"
+            >
+              <option value="subject">Subject</option>
               <option value="location">Location</option>
               <option value="price">Price</option>
               <option value="spaces">Spaces</option>
-              <option value="subject">Subject</option>
             </select>
 
-            <select v-model="sortDir" class="form-select w-auto">
-              <option value="asc">Asc</option>
-              <option value="desc">Desc</option>
+            <label class="form-label mb-0 ms-2">Order:</label>
+            <select
+              v-model="sortDir"
+              class="form-select form-select-sm w-auto"
+            >
+              <option value="asc">Ascending</option>
+              <option value="desc">Descending</option>
             </select>
           </div>
         </div>
 
-        <ul class="list-group mb-3">
-          <li v-for="loc in sortedLocations"
-              :key="loc.city"
-              class="list-group-item d-flex justify-content-between align-items-center"
-              :class="{ 'out-of-stock': loc.spaces === 0 }">
+        <!-- Search bar (search as you type) -->
+        <div class="mb-3">
+          <input
+            type="text"
+            v-model="searchQuery"
+            class="form-control"
+            placeholder="Search by subject, location, price, or spaces..."
+          />
+        </div>
 
-            <div>
-              <strong>{{ loc.city }}</strong> – £{{ loc.price }}
-              <span v-if="loc.spaces > 0"> (Spaces: {{ loc.spaces }})</span>
+        <!-- Lessons list as cards -->
+        <div class="row">
+          <div
+            class="col-sm-6 col-md-4 col-lg-3 mb-3"
+            v-for="lesson in displayedLessons"
+            :key="lesson.subject + '|' + lesson.location"
+          >
+            <div class="card subject-card h-100 d-flex flex-column">
+              <!-- Lesson image -->
+              <img
+                :src="imageUrl(lesson.image)"
+                class="subject-thumb"
+                :alt="lesson.subject + ' image'"
+              />
+
+              <div class="card-body d-flex flex-column">
+                <h5 class="card-title mb-1">{{ lesson.subject }}</h5>
+                <p class="card-text mb-1">
+                  <i class="fa fa-location-dot me-1"></i>
+                  {{ lesson.location }}
+                </p>
+                <p class="card-text mb-1">
+                  <strong>£{{ lesson.price }}</strong>
+                </p>
+                <p class="card-text mb-2">
+                  Spaces left:
+                  <span
+                    :class="{
+                      'text-danger fw-semibold': lesson.spaces === 0,
+                      'text-warning fw-semibold': lesson.spaces > 0 && lesson.spaces <= 2
+                    }"
+                  >
+                    {{ lesson.spaces }}
+                  </span>
+                </p>
+
+                <div class="mt-auto">
+                  <button
+                    class="btn btn-primary w-100"
+                    :disabled="lesson.spaces === 0"
+                    @click="addToCart(lesson)"
+                  >
+                    <span v-if="lesson.spaces > 0">
+                      <i class="fa fa-cart-plus me-1"></i>
+                      Add to Cart
+                    </span>
+                    <span v-else>
+                      <i class="fa fa-ban me-1"></i>
+                      Out of Stock
+                    </span>
+                  </button>
+                </div>
+              </div>
             </div>
+          </div>
 
-            <button class="btn btn-primary btn-sm"
-                    :disabled="loc.spaces === 0"
-                    @click="addToCart(loc)">Add</button>
-          </li>
-        </ul>
-
-        <button class="btn btn-secondary" @click="go('subjects')">Back</button>
-        <button class="btn btn-outline-dark ms-2" @click="go('cart')">Cart</button>
+          <!-- If no lessons match the search -->
+          <div v-if="!displayedLessons.length" class="col-12">
+            <div class="alert alert-info">
+              No lessons match your search. Try a different word.
+            </div>
+          </div>
+        </div>
       </section>
 
-      <!-- ============= CART PAGE ============= -->
+      <!-- ==============================
+           CART PAGE (view === 'cart')
+           ============================== -->
       <section v-if="view === 'cart'">
-        <h2>Your Cart</h2>
+        <h2 class="mb-3">Your Shopping Cart</h2>
 
-        <div v-if="!cart.length" class="alert alert-warning">Cart is empty.</div>
+        <!-- Empty cart message -->
+        <div v-if="!cart.length" class="alert alert-warning">
+          Your cart is empty. Go back to the lessons page to add some seats.
+        </div>
 
-        <ul v-else class="list-group mb-3">
-          <li v-for="item in groupedCart"
-              :key="item.subject + item.city"
-              class="list-group-item d-flex justify-content-between align-items-center">
+        <!-- Cart items list -->
+        <div v-else>
+          <ul class="list-group mb-3">
+            <li
+              v-for="item in groupedCart"
+              :key="item.subject + '|' + item.location"
+              class="list-group-item d-flex justify-content-between align-items-center"
+            >
+              <div>
+                <strong>{{ item.subject }}</strong>
+                <span class="text-muted">({{ item.location }})</span>
+                – £{{ item.price }} × {{ item.quantity }}
+                =
+                <strong>£{{ item.price * item.quantity }}</strong>
+              </div>
 
-            <span>
-              {{ item.subject }} ({{ item.city }}) × {{ item.quantity }}
-              = £{{ item.quantity * item.price }}
-            </span>
+              <button
+                class="btn btn-sm btn-outline-secondary"
+                @click="removeOne(item)"
+              >
+                Remove 1
+              </button>
+            </li>
+          </ul>
 
-            <div>
-              <button class="btn btn-sm btn-outline-secondary me-2"
-                      @click="removeOne(item)">Remove 1</button>
-              <button class="btn btn-sm btn-outline-danger"
-                      @click="removeAll(item)">Remove All</button>
+          <!-- Cart summary -->
+          <div class="d-flex justify-content-between align-items-center mb-4">
+            <h5 class="mb-0">
+              Total: £{{ cartTotal }} ({{ cartCount }} item<span v-if="cartCount !== 1">s</span>)
+            </h5>
+            <button
+              class="btn btn-secondary"
+              type="button"
+              @click="go('lessons')"
+            >
+              Back to Lessons
+            </button>
+          </div>
+
+          <!-- Checkout form (part of cart page as required) -->
+          <h3 class="mb-3">Checkout</h3>
+
+          <form
+            class="col-md-6 p-0 mb-3"
+            @submit.prevent="checkout"
+          >
+            <div class="mb-3">
+              <label class="form-label">Name</label>
+              <input
+                v-model="customer.name"
+                class="form-control"
+                placeholder="Your full name"
+                required
+              />
+              <small class="text-muted">Letters and spaces only.</small>
             </div>
-          </li>
-        </ul>
 
-        <div v-if="cart.length" class="d-flex justify-content-between">
-          <h5>Total: £{{ cartTotal }}</h5>
-          <button class="btn btn-success" @click="go('checkout')">Checkout</button>
+            <div class="mb-3">
+              <label class="form-label">Phone</label>
+              <input
+                v-model="customer.phone"
+                class="form-control"
+                placeholder="07..."
+                required
+              />
+              <small class="text-muted">Digits only, no spaces or symbols.</small>
+            </div>
+
+            <button
+              class="btn btn-success"
+              type="submit"
+              :disabled="!isCheckoutValid"
+            >
+              Submit Order
+            </button>
+          </form>
+
+          <!-- Order confirmation -->
+          <div
+            v-if="orderMessage"
+            class="alert alert-success mt-2"
+          >
+            {{ orderMessage }}
+          </div>
         </div>
       </section>
-
-      <!-- ============= CHECKOUT PAGE ============= -->
-      <section v-if="view === 'checkout'">
-
-        <h2>Checkout</h2>
-
-        <form @submit.prevent="checkout" class="col-md-6 p-0 mb-3">
-          <input v-model="customer.name"
-                 class="form-control mb-2"
-                 placeholder="Full Name"
-                 required>
-
-          <input v-model="customer.phone"
-                 class="form-control mb-2"
-                 placeholder="Phone Number"
-                 required>
-
-          <button class="btn btn-primary" :disabled="!isCheckoutValid">
-            Submit Order
-          </button>
-        </form>
-
-        <div v-if="orderMessage" class="alert alert-success">
-          {{ orderMessage }}
-        </div>
-
-      </section>
-
     </div>
   </div>
 
-  <!-- Vue and App.js -->
+  <!-- Vue and app.js -->
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <script src="app.js"></script>
-
 </body>
 </html>
